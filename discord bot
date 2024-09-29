@@ -1,0 +1,77 @@
+import discord
+from discord.ext import commands
+import youtube_dl
+
+intents = discord.Intents.default()
+intents.members = True
+
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Kayıt edilen kullanıcılar
+kayıtlı_kullanıcılar = {}
+
+@bot.event
+async def on_ready():
+    print(f'{bot.user} olarak giriş yapıldı!')
+
+@bot.command()
+async def kayıt(ctx, *, isim):
+    """Kullanıcıyı kaydet."""
+    kayıtlı_kullanıcılar[ctx.author.id] = isim
+    await ctx.send(f'{ctx.author.mention} başarıyla {isim} olarak kaydedildi!')
+
+@bot.command()
+async def kayıtlı(ctx):
+    """Kayıtlı kullanıcıyı gösterir."""
+    isim = kayıtlı_kullanıcılar.get(ctx.author.id, None)
+    if isim:
+        await ctx.send(f'Kayıtlı isminiz: {isim}')
+    else:
+        await ctx.send(f'{ctx.author.mention} henüz kayıtlı değilsiniz!')
+
+@bot.command()
+async def müzik(ctx, url):
+    """Verilen URL'den müzik çalar."""
+    if not ctx.voice_client:
+        if ctx.author.voice:
+            channel = ctx.author.voice.channel
+            await channel.connect()
+        else:
+            await ctx.send("Önce bir ses kanalına katılmalısınız!")
+            return
+
+    ydl_opts = {
+        'format': 'bestaudio',
+        'extractaudio': True,
+        'audioformat': 'mp3',
+        'outtmpl': 'downloads/%(title)s.%(ext)s',
+        'noplaylist': True,
+    }
+
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        url = info['formats'][0]['url']
+        title = info['title']
+
+    ctx.voice_client.play(discord.FFmpegPCMAudio(url))
+    await ctx.send(f'{title} çalıyor!')
+
+@bot.command()
+async def durdur(ctx):
+    """Müziği durdur."""
+    if ctx.voice_client.is_playing():
+        ctx.voice_client.stop()
+        await ctx.send("Müzik durduruldu.")
+    else:
+        await ctx.send("Şu anda çalan bir müzik yok.")
+
+@bot.command()
+async def çık(ctx):
+    """Ses kanalından çıkar."""
+    if ctx.voice_client:
+        await ctx.voice_client.disconnect()
+        await ctx.send("Ses kanalından ayrıldım.")
+    else:
+        await ctx.send("Hiçbir ses kanalında değilim.")
+
+bot.run('TOKENİNİZİ_BURAYA_YERLEŞTİRİN')
